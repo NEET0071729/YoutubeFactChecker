@@ -1,0 +1,50 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-primary: #0f0f13;
+  --bg-secondary: #1a1a24;
+  --bg-card: #1e1e2e;
+  --bg-input: #252535;
+  --border: #2e2e42;
+  --border-hover: #4a4a6a;
+  --text-primary: #e8e8f0;
+  --text-secondary: #9090b0;
+  --text-muted: #5a5a7a;
+  --accent: #ff3a3a;
+  --accent-hover: #ff5555;
+  --accent-dim: rgba(255, 58, 58, 0.15);
+  --success: #4ade80;
+  --success-dim: rgba(74, 222, 128, 0.12);
+  --error: #f87171;
+  --error-dim: rgba(248, 113, 113, 0.12);
+  --user-bubble: #2a2a3e;
+  --ai-bubble: #1e2a1e;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 3px;
+}

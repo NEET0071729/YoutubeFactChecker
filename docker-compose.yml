@@ -1,0 +1,21 @@
+services:
+  backend:
+    image: youtube-fact-checker:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - chroma_data:/app/chroma_db
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+volumes:
+  chroma_data:

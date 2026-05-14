@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Fact Checker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f0f13;
+      --bg2:      #1a1a24;
+      --card:     #1e1e2e;
+      --input:    #252535;
+      --border:   #2e2e42;
+      --bh:       #4a4a6a;
+      --fg:       #e8e8f0;
+      --fg2:      #9090b0;
+      --muted:    #5a5a7a;
+      --red:      #ff3a3a;
+      --red2:     #ff5555;
+      --green:    #4ade80;
+      --green-d:  rgba(74,222,128,.12);
+      --err:      #f87171;
+      --err-d:    rgba(248,113,113,.12);
+    }
+
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: var(--bh); border-radius: 3px; }
+
+    /* ── layout ── */
+    .layout { display: flex; flex-direction: column; height: 100vh; }
+
+    header {
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+    }
+    .header-inner {
+      max-width: 1400px; margin: 0 auto;
+      height: 54px; display: flex; align-items: center; gap: .8rem;
+    }
+    .brand { display: flex; align-items: center; gap: .55rem; }
+    .brand svg { flex-shrink: 0; }
+    .brand-name { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; }
+    .brand-tag  { font-size: .75rem; color: var(--muted); margin-left: .25rem; }
+
+    .content {
+      flex: 1; display: flex; overflow: hidden;
+      max-width: 1400px; width: 100%; margin: 0 auto;
+      padding: 1.25rem; gap: 1.25rem;
+    }
+
+    /* ── ingest panel ── */
+    .ingest {
+      width: 300px; flex-shrink: 0;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.2rem; display: flex; flex-direction: column; gap: .9rem; overflow-y: auto;
+    }
+    .panel-title { font-size: .95rem; font-weight: 700; }
+    .panel-sub   { font-size: .75rem; color: var(--muted); }
+
+    input[type="url"], input[type="text"] {
+      width: 100%; background: var(--input); border: 1px solid var(--border);
+      border-radius: 8px; padding: .55rem .75rem; font-size: .85rem; color: var(--fg);
+      outline: none; transition: border-color .15s;
+    }
+    input:focus { border-color: var(--red); }
+    input:disabled { opacity: .5; cursor: not-allowed; }
+    input::placeholder { color: var(--muted); }
+
+    /* ── buttons ── */
+    button {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      border: none; border-radius: 8px; font-size: .85rem; font-weight: 600;
+      cursor: pointer; transition: background .15s, opacity .15s;
+    }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-red  { background: var(--red); color: #fff; padding: .55rem 1rem; width: 100%; }
+    .btn-red:hover:not(:disabled) { background: var(--red2); }
+
+    .btn-ghost {
+      background: var(--input); color: var(--fg2); border: 1px solid var(--border);
+      padding: .38rem .7rem; font-size: .8rem;
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--border); color: var(--fg); }
+
+    .btn-send {
+      background: var(--red); color: #fff;
+      width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+    }
+    .btn-send:hover:not(:disabled) { background: var(--red2); }
+
+    /* ── status ── */
+    .status {
+      display: flex; align-items: flex-start; gap: .5rem;
+      padding: .6rem .7rem; border-radius: 8px; font-size: .82rem; line-height: 1.4;
+    }
+    .status.ok  { background: var(--green-d); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+    .status.err { background: var(--err-d);   color: var(--err);   border: 1px solid rgba(248,113,113,.25); }
+    .status.hidden { display: none; }
+
+    /* ── video history ── */
+    .sec-label {
+      font-size: .7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted);
+    }
+    .video-list { list-style: none; display: flex; flex-direction: column; gap: .45rem; }
+    .video-item {
+      display: flex; align-items: flex-start; gap: .55rem;
+      padding: .55rem; background: var(--input); border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .video-item:hover { border-color: var(--bh); }
+    .video-info { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+    .video-link {
+      font-size: .83rem; font-weight: 600; color: var(--fg);
+      text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .video-link:hover { color: var(--red); text-decoration: underline; }
+    .video-meta { font-size: .72rem; color: var(--muted); }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; gap: .65rem;
+      padding: 1.5rem .5rem; text-align: center;
+      color: var(--muted); font-size: .83rem; line-height: 1.5;
+    }
+
+    /* ── chat panel ── */
+    .chat {
+      flex: 1; display: flex; flex-direction: column;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; min-width: 0;
+    }
+    .chat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .9rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .chat-title { font-size: .95rem; font-weight: 700; }
+    .thread-id  { font-size: .72rem; color: var(--muted); }
+
+    .messages {
+      flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
+      display: flex; flex-direction: column; gap: .9rem;
+    }
+
+    .chat-empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: .9rem;
+      text-align: center; color: var(--fg2); font-size: .88rem; line-height: 1.6;
+    }
+    .chat-empty svg { opacity: .4; }
+    .hint { color: var(--muted); font-size: .8rem; }
+
+    /* ── bubbles ── */
+    .msg { display: flex; }
+    .msg.user { justify-content: flex-end; }
+    .msg.ai, .msg.error { justify-content: flex-start; }
+
+    .bubble {
+      max-width: 75%; padding: .7rem .95rem; border-radius: 12px;
+      font-size: .88rem; line-height: 1.6;
+    }
+    .bubble.user  {
+      background: #2a2a3e; border: 1px solid var(--border);
+      border-bottom-right-radius: 4px; white-space: pre-wrap;
+    }
+    .bubble.ai    {
+      background: #1e2a1e; border: 1px solid rgba(74,222,128,.2);
+      border-bottom-left-radius: 4px; max-width: 88%;
+    }
+    .bubble.error {
+      background: var(--err-d); border: 1px solid rgba(248,113,113,.2);
+      color: var(--err); border-bottom-left-radius: 4px;
+    }
+    .bubble.loading {
+      display: flex; align-items: center; gap: .6rem;
+      color: var(--muted); font-size: .84rem; font-style: italic;
+    }
+
+    .ai-label {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--green);
+      margin-bottom: .55rem; padding-bottom: .55rem;
+      border-bottom: 1px solid rgba(74,222,128,.15);
+    }
+
+    /* markdown-ish rendering */
+    .md h1, .md h2, .md h3 { font-size: .93rem; font-weight: 700; margin: .7rem 0 .3rem; }
+    .md p  { margin: .35rem 0; }
+    .md ul, .md ol { margin: .35rem 0 .35rem 1.1rem; }
+    .md li { margin: .15rem 0; }
+    .md strong { font-weight: 700; }
+    .md em { color: var(--fg2); font-style: italic; }
+    .md code {
+      background: var(--input); padding: .1em .3em; border-radius: 4px;
+      font-size: .81em; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    .md blockquote {
+      border-left: 3px solid var(--green); padding-left: .7rem;
+      color: var(--fg2); margin: .4rem 0;
+    }
+    .md a { color: var(--red); text-decoration: none; }
+    .md a:hover { text-decoration: underline; }
+
+    /* ── input area ── */
+    .chat-input-area {
+      display: flex; align-items: flex-end; gap: .5rem;
+      padding: .7rem 1.25rem .9rem; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    textarea {
+      flex: 1; background: var(--input); border: 1px solid var(--border);
+      border-radius: 10px; padding: .6rem .85rem; font-size: .88rem; color: var(--fg);
+      font-family: inherit; resize: none; outline: none;
+      min-height: 40px; max-height: 130px; overflow-y: auto;
+      line-height: 1.5; transition: border-color .15s;
+    }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus { border-color: var(--red); }
+    textarea:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── spinner ── */
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.2); border-top-color: currentColor;
+      border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── responsive ── */
+    @media (max-width: 720px) {
+      .content { flex-direction: column; padding: .75rem; gap: .75rem; }
+      .ingest { width: 100%; max-height: 300px; }
+      .bubble { max-width: 92%; }
+      .bubble.ai { max-width: 97%; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <!-- YouTube-style icon -->
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="6" fill="#FF0000"/>
+          <polygon points="11,9 11,19 20,14" fill="white"/>
+        </svg>
+        <span class="brand-name">YouTube Fact Checker</span>
+      </div>
+      <span class="brand-tag">AI-powered answers · web fact-checked</span>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ── Ingest Panel ── -->
+    <aside class="ingest">
+      <div>
+        <div class="panel-title">Add Video</div>
+        <div class="panel-sub">Paste a YouTube URL to index it</div>
+      </div>
+
+      <input type="url" id="urlInput" placeholder="https://youtube.com/watch?v=..." />
+      <button class="btn-red" id="ingestBtn" onclick="handleIngest()">Ingest</button>
+
+      <div class="status hidden" id="ingestStatus"></div>
+
+      <div id="historySection" style="display:none; display:flex; flex-direction:column; gap:.6rem;">
+        <div class="sec-label">Indexed videos</div>
+        <ul class="video-list" id="videoList"></ul>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="6" fill="#FF0000" opacity=".3"/>
+          <polygon points="11,9 11,19 20,14" fill="white" opacity=".4"/>
+        </svg>
+        <p>No videos indexed yet.<br/>Paste a URL above to start.</p>
+      </div>
+    </aside>
+
+    <!-- ── Chat Panel ── -->
+    <section class="chat">
+      <div class="chat-header">
+        <div>
+          <div class="chat-title">Ask Questions</div>
+          <div class="thread-id" id="threadLabel">New conversation</div>
+        </div>
+        <button class="btn-ghost" onclick="resetChat()">＋ New</button>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="chat-empty" id="chatEmpty">
+          <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+            <circle cx="21" cy="21" r="20" stroke="#4a4a6a" stroke-width="1.5"/>
+            <path d="M13 21h16M21 13l8 8-8 8" stroke="#5a5a7a" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p>Ask anything about your indexed videos.<br/>
+            <span class="hint">The AI fact-checks its own answers using live web sources.</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <textarea id="chatInput" rows="1"
+          placeholder="Ask a question… (Enter to send, Shift+Enter for newline)"
+          onkeydown="handleChatKey(event)"
+          oninput="autoResize(this)"></textarea>
+        <button class="btn-send" id="sendBtn" onclick="handleSend()" title="Send">
+          <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+            <path d="M2 9h14M9 2l7 7-7 7" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  const API = 'http://23.22.168.1:8000';
+  let threadId = null;
+  let history = [];
+
+  // ── init ──
+  try { history = JSON.parse(localStorage.getItem('yfcVideos') || '[]'); } catch {}
+  renderHistory();
+
+  // ── ingest ──
+  async function handleIngest() {
+    const input = document.getElementById('urlInput');
+    const url = input.value.trim();
+    if (!url) return;
+
+    setIngestLoading(true);
+    showIngestStatus('');
+
+    try {
+      const res = await fetch(`${API}/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Ingest failed');
+
+      const entry = {
+        url,
+        video_id: data.video_id,
+        chunks: data.chunks_ingested,
+        timestamp: new Date().toLocaleString(),
+      };
+      history = [entry, ...history].slice(0, 20);
+      localStorage.setItem('yfcVideos', JSON.stringify(history));
+      renderHistory();
+      showIngestStatus(`✓ Ingested ${data.chunks_ingested} chunks from ${data.video_id}`, 'ok');
+      input.value = '';
+    } catch (e) {
+      showIngestStatus(`✕ ${e.message}`, 'err');
+    } finally {
+      setIngestLoading(false);
+    }
+  }
+
+  function setIngestLoading(on) {
+    const btn = document.getElementById('ingestBtn');
+    const inp = document.getElementById('urlInput');
+    btn.disabled = on;
+    inp.disabled = on;
+    btn.innerHTML = on
+      ? '<span class="spinner"></span>'
+      : 'Ingest';
+  }
+
+  function showIngestStatus(msg, type) {
+    const el = document.getElementById('ingestStatus');
+    if (!msg) { el.className = 'status hidden'; return; }
+    el.className = `status ${type}`;
+    el.textContent = msg;
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('videoList');
+    const section = document.getElementById('historySection');
+    const empty = document.getElementById('emptyState');
+    list.innerHTML = '';
+
+    if (history.length === 0) {
+      section.style.display = 'none';
+      empty.style.display = 'flex';
+      return;
+    }
+    section.style.display = 'flex';
+    empty.style.display = 'none';
+
+    history.forEach(v => {
+      const li = document.createElement('li');
+      li.className = 'video-item';
+      li.innerHTML = `
+        <svg width="26" height="26" viewBox="0 0 28 28" fill="none" style="flex-shrink:0">
+          <rect width="28" height="28" rx="5" fill="#FF0000"/>
+          <polygon points="11,9 11,19 20,14" fill="white"/>
+        </svg>
+        <div class="video-info">
+          <a class="video-link" href="https://youtube.com/watch?v=${v.video_id}"
+             target="_blank" rel="noopener">${v.video_id}</a>
+          <span class="video-meta">${v.chunks} chunks · ${v.timestamp}</span>
+        </div>`;
+      list.appendChild(li);
+    });
+  }
+
+  // ── chat ──
+  async function handleSend() {
+    const ta = document.getElementById('chatInput');
+    const text = ta.value.trim();
+    if (!text) return;
+
+    ta.value = '';
+    ta.style.height = '';
+    appendMessage('user', text);
+    setChatLoading(true);
+
+    try {
+      const res = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, thread_id: threadId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Chat request failed');
+
+      threadId = data.thread_id;
+      document.getElementById('threadLabel').textContent =
+        `Thread: ${threadId.slice(0, 8)}…`;
+
+      if (data.final_answer) {
+        appendMessage('ai', data.final_answer);
+      }
+    } catch (e) {
+      appendMessage('error', `Error: ${e.message}`);
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  function setChatLoading(on) {
+    const ta = document.getElementById('chatInput');
+    const btn = document.getElementById('sendBtn');
+    ta.disabled = on;
+    btn.disabled = on;
+
+    const existing = document.getElementById('loadingBubble');
+    if (on && !existing) {
+      const div = document.createElement('div');
+      div.className = 'msg ai';
+      div.id = 'loadingBubble';
+      div.innerHTML = `<div class="bubble ai loading">
+        <span class="spinner"></span>
+        <span>Searching transcripts &amp; fact-checking…</span>
+      </div>`;
+      document.getElementById('messages').appendChild(div);
+      scrollBottom();
+    } else if (!on && existing) {
+      existing.remove();
+    }
+  }
+
+  function appendMessage(role, text) {
+    const empty = document.getElementById('chatEmpty');
+    if (empty) empty.remove();
+
+    const container = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+
+    if (role === 'user') {
+      div.innerHTML = `<div class="bubble user">${escapeHtml(text)}</div>`;
+    } else if (role === 'error') {
+      div.innerHTML = `<div class="bubble error">${escapeHtml(text)}</div>`;
+    } else {
+      div.innerHTML = `<div class="bubble ai">
+        <div class="ai-label">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7.5" stroke="#4ade80"/>
+            <path d="M5 8l2 2 4-4" stroke="#4ade80" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Fact-checked answer
+        </div>
+        <div class="md">${renderMarkdown(text)}</div>
+      </div>`;
+    }
+
+    container.appendChild(div);
+    scrollBottom();
+  }
+
+  function resetChat() {
+    threadId = null;
+    document.getElementById('threadLabel').textContent = 'New conversation';
+    const container = document.getElementById('messages');
+    container.innerHTML = `
+      <div class="chat-empty" id="chatEmpty">
+        <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+          <circle cx="21" cy="21" r="20" stroke="#4a4a6a" stroke-width="1.5"/>
+          <path d="M13 21h16M21 13l8 8-8 8" stroke="#5a5a7a" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Ask anything about your indexed videos.<br/>
+          <span class="hint">The AI fact-checks its own answers using live web sources.</span>
+        </p>
+      </div>`;
+  }
+
+  function handleChatKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 130) + 'px';
+  }
+
+  function scrollBottom() {
+    const c = document.getElementById('messages');
+    c.scrollTop = c.scrollHeight;
+  }
+
+  // ── helpers ──
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderMarkdown(text) {
+    // minimal markdown → HTML (no external lib needed)
+    let html = escapeHtml(text);
+
+    // headings
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+
+    // bold / italic
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+
+    // inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    // unordered list items
+    html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+    // numbered list items
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // blockquote
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // paragraphs (double newline)
+    html = html.split(/\n\n+/).map(block => {
+      block = block.trim();
+      if (!block) return '';
+      if (/^<(h[123]|ul|ol|li|blockquote)/.test(block)) return block;
+      return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
+
+    return html;
+  }
+
+  // ── enter on url input ──
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleIngest();
+  });
+</script>
+</body>
+</html>

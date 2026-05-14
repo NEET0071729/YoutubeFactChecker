@@ -1,0 +1,14 @@
+# Secrets
+.env
+frontend/.env.production
+
+# Not needed in the image
+frontend/
+.venv/
+.git/
+.claude/
+*.tar.gz
+
+# Python artifacts
+backend/__pycache__/
+backend/chroma_db/
