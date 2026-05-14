@@ -55,6 +55,16 @@ def ingest(url_or_id: str) -> int:
     return len(chunks)
 
 
+def ingest_text(video_id: str, transcript: str) -> int:
+    """Store a pre-fetched transcript string into Chroma (no YouTube request made)."""
+    from langchain_core.documents import Document
+    doc = Document(page_content=transcript, metadata={"source": video_id})
+    chunks = _splitter.split_documents([doc])
+    _vectorstore.add_documents(chunks)
+    print(f"Ingested {len(chunks)} chunks from pre-fetched transcript for {video_id}")
+    return len(chunks)
+
+
 if __name__ == "__main__":
     import sys
 

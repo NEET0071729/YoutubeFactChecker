@@ -102,6 +102,21 @@ You can also ingest from the command line:
 python backend/ingest.py "https://youtube.com/watch?v=VIDEO_ID"
 ```
 
+### Ingesting on EC2 (YouTube IP blocks)
+
+When the backend is deployed on EC2, YouTube often blocks transcript requests from datacenter IPs. Use `ingest_local.py` to fetch the transcript on your local machine and push it to the remote backend:
+
+```bash
+pip install youtube-transcript-api requests
+
+python ingest_local.py "https://youtube.com/watch?v=VIDEO_ID"
+
+# Custom backend host:
+python ingest_local.py "https://youtube.com/watch?v=VIDEO_ID" --host http://<EC2_IP>:8000
+```
+
+This fetches the transcript locally (residential IP) and POSTs it to the `/ingest-text` endpoint on the server.
+
 ### Ask Questions
 
 Type a question in the chat panel. The app supports multi-turn conversations — each thread maintains its own context. Start a new conversation with the **+** button.
@@ -111,12 +126,18 @@ Type a question in the chat panel. The app supports multi-turn conversations —
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Health check |
-| `POST` | `/ingest` | Ingest a YouTube video |
+| `POST` | `/ingest` | Ingest a YouTube video by URL |
+| `POST` | `/ingest-text` | Ingest a pre-fetched transcript (used by `ingest_local.py`) |
 | `POST` | `/chat` | Send a message and get a fact-checked answer |
 
 **Ingest request:**
 ```json
 { "url": "https://youtube.com/watch?v=..." }
+```
+
+**Ingest-text request:**
+```json
+{ "video_id": "VIDEO_ID", "transcript": "full transcript text..." }
 ```
 
 **Chat request:**
@@ -142,6 +163,7 @@ YoutubeFactChecker/
 ├── frontend/
 │   └── src/
 │       └── App.tsx   # Main React UI
+├── ingest_local.py   # Local ingestion helper for EC2 deployments
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt

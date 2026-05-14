@@ -12,7 +12,7 @@ from langgraph.types import Command
 import uvicorn
 
 from graph import graph
-from ingest import ingest as ingest_video
+from ingest import ingest as ingest_video, ingest_text as ingest_raw_text
 
 app = FastAPI(title="YouTube Fact Checker API")
 
@@ -34,6 +34,11 @@ class IngestRequest(BaseModel):
 class IngestResponse(BaseModel):
     video_id: str
     chunks_ingested: int
+
+
+class IngestTextRequest(BaseModel):
+    video_id: str
+    transcript: str
 
 
 class ChatRequest(BaseModel):
@@ -75,6 +80,15 @@ def ingest_endpoint(req: IngestRequest):
         from ingest import _extract_video_id
         video_id = _extract_video_id(req.url)
         return IngestResponse(video_id=video_id, chunks_ingested=count)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/ingest-text", response_model=IngestResponse)
+def ingest_text_endpoint(req: IngestTextRequest):
+    try:
+        count = ingest_raw_text(req.video_id, req.transcript)
+        return IngestResponse(video_id=req.video_id, chunks_ingested=count)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
