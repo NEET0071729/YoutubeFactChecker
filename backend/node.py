@@ -7,6 +7,7 @@ from tavily import TavilyClient
 
 from state import State
 
+# Full model for complex reasoning steps; lite model for cheaper extraction tasks
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GOOGLE_API_KEY"))
 llm_lite = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -14,6 +15,7 @@ _tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 
 def _text(response) -> str:
+    """Flatten a Gemini response (plain string or content-block list) to a single string."""
     content = response.content
     if isinstance(content, list):
         return "".join(
@@ -22,6 +24,7 @@ def _text(response) -> str:
         )
     return content
 
+# Must use the same collection name and persist directory as ingest.py
 _embeddings = GoogleGenerativeAIEmbeddings(
     model="models/gemini-embedding-001",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
@@ -34,11 +37,13 @@ _vectorstore = Chroma(
 
 
 def add_query_to_state(state: State) -> dict:
+    """Pause graph execution and wait for the user's next question via HTTP."""
     user_input = interrupt("Enter your question (or 'n' to exit): ")
     return {"query": user_input}
 
 
 def rewrite_query(state: State) -> dict:
+    """Rewrite the raw query using chat history to produce a more precise search string."""
     query = state["query"]
     chat_history = state.get("chat_history", [])
 
@@ -67,6 +72,7 @@ def rewrite_query(state: State) -> dict:
 
 
 def youtube_vector_search(state: State) -> dict:
+    """Retrieve the top-5 transcript chunks and synthesise an answer from them."""
     rewritten_query = state["rewritten_query"]
 
     docs = _vectorstore.similarity_search(rewritten_query, k=5)
@@ -90,6 +96,7 @@ def youtube_vector_search(state: State) -> dict:
 
 
 def extract_claims(state: State) -> dict:
+    """Parse the YouTube answer into a list of individual verifiable factual claims."""
     youtube_ans = state["youtube_ans"]
 
     messages = [
@@ -114,6 +121,7 @@ def extract_claims(state: State) -> dict:
 
 
 def search_facts(state: State) -> dict:
+    """Web-search each claim via Tavily and collect supporting/contradicting sources."""
     claims = state["claims"]
     facts = []
 
@@ -134,6 +142,7 @@ def search_facts(state: State) -> dict:
 
 
 def generate_final_answer(state: State) -> dict:
+    """Combine the YouTube answer, extracted claims, and web evidence into a fact-checked response."""
     youtube_ans = state["youtube_ans"]
     claims = state["claims"]
     facts = state["facts"]

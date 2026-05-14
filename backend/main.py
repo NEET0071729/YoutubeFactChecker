@@ -2,6 +2,7 @@ import uuid
 import os
 from dotenv import load_dotenv, find_dotenv
 
+# Load .env before any module that reads env vars at import time (e.g. graph, ingest)
 load_dotenv(find_dotenv())
 
 from fastapi import FastAPI, HTTPException
@@ -15,6 +16,7 @@ from ingest import ingest as ingest_video
 
 app = FastAPI(title="YouTube Fact Checker API")
 
+# Allow all origins in dev; tighten allow_origins for production deployments
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,22 +38,24 @@ class IngestResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    thread_id: str | None = None
+    thread_id: str | None = None  # omit to start a new conversation thread
 
 
 class ChatResponse(BaseModel):
     thread_id: str
     final_answer: str | None
-    status: str  # "waiting" | "ended"
+    status: str  # "waiting" = graph paused at interrupt | "ended" = user typed "n"
 
 
 # ---------- helpers ----------
 
 def _config(thread_id: str) -> dict:
+    """Build the LangGraph config dict for a given thread."""
     return {"configurable": {"thread_id": thread_id}}
 
 
 def _is_new_thread(thread_id: str) -> bool:
+    """Return True if no checkpointed state exists for this thread yet."""
     state = graph.get_state(_config(thread_id))
     return not state.values
 
@@ -67,7 +71,7 @@ def health():
 def ingest_endpoint(req: IngestRequest):
     try:
         count = ingest_video(req.url)
-        # extract video id from url for response
+        # Re-use the private helper to parse the video ID for the response
         from ingest import _extract_video_id
         video_id = _extract_video_id(req.url)
         return IngestResponse(video_id=video_id, chunks_ingested=count)
@@ -82,7 +86,7 @@ def chat(req: ChatRequest):
 
     try:
         if _is_new_thread(thread_id):
-            # initialise the graph so it reaches the first interrupt
+            # Prime the graph so it advances to the first interrupt before we resume
             graph.invoke({"messages": []}, config)
 
         result = graph.invoke(Command(resume=req.message), config)
@@ -90,7 +94,7 @@ def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
     final_state = graph.get_state(config)
-    is_ended = len(final_state.next) == 0
+    is_ended = len(final_state.next) == 0  # no pending nodes means the graph reached END
 
     return ChatResponse(
         thread_id=thread_id,
