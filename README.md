@@ -104,7 +104,7 @@ python backend/ingest.py "https://youtube.com/watch?v=VIDEO_ID"
 
 ### Ingesting on EC2 (YouTube IP blocks)
 
-When the backend is deployed on EC2, YouTube often blocks transcript requests from datacenter IPs. Use `ingest_local.py` to fetch the transcript on your local machine and push it to the remote backend:
+When the backend is deployed on EC2, YouTube often blocks transcript requests from datacenter IPs. The `/ingest` endpoint will return a `403` error with a message indicating the IP is blocked. Use `ingest_local.py` to fetch the transcript on your local machine and push it to the remote backend instead:
 
 ```bash
 pip install youtube-transcript-api requests
@@ -126,7 +126,7 @@ Type a question in the chat panel. The app supports multi-turn conversations —
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Health check |
-| `POST` | `/ingest` | Ingest a YouTube video by URL |
+| `POST` | `/ingest` | Ingest a YouTube video by URL (returns `403` if server IP is blocked by YouTube) |
 | `POST` | `/ingest-text` | Ingest a pre-fetched transcript (used by `ingest_local.py`) |
 | `POST` | `/chat` | Send a message and get a fact-checked answer |
 

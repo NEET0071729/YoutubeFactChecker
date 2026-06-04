@@ -76,12 +76,14 @@ def health():
 def ingest_endpoint(req: IngestRequest):
     try:
         count = ingest_video(req.url)
-        # Re-use the private helper to parse the video ID for the response
         from ingest import _extract_video_id
         video_id = _extract_video_id(req.url)
         return IngestResponse(video_id=video_id, chunks_ingested=count)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        msg = str(e)
+        if "ip" in msg.lower() or "blocked" in msg.lower() or "cloud" in msg.lower() or "transcript" in msg.lower():
+            raise HTTPException(status_code=403, detail="YouTube is blocking transcript requests from this server's IP. This is a known restriction on cloud provider IPs (AWS, GCP, Azure).")
+        raise HTTPException(status_code=400, detail=msg)
 
 
 @app.post("/ingest-text", response_model=IngestResponse)

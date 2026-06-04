@@ -7,7 +7,7 @@ Usage:
     python ingest_local.py <youtube_url_or_video_id>
 
     # Custom EC2 host:
-    python ingest_local.py <youtube_url_or_video_id> --host http://23.22.168.1:8000
+    python ingest_local.py <youtube_url_or_video_id> --host http://3.6.87.154:8000
 """
 
 import re
@@ -16,7 +16,7 @@ import argparse
 import requests
 from youtube_transcript_api import YouTubeTranscriptApi
 
-EC2_HOST = "http://23.22.168.1:8000"
+EC2_HOST = "http://3.6.87.154:8000"
 
 
 def extract_video_id(url_or_id: str) -> str:
